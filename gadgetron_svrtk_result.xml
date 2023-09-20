@@ -56,7 +56,7 @@
     <!-- Images; Real -->
 
     <external>
-      <execute name="nifti_python_gadgetron_svrtk" target="IsmrmrdToNiftiGadget" type="python"/>
+      <execute name="nifti_python_gadgetron_svrtk_result" target="IsmrmrdToNiftiGadget" type="python"/>
       <configuration/>
     </external> 
     

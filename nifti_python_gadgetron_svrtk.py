@@ -239,9 +239,6 @@ def figstring(name):
 
 
 def IsmrmrdToNiftiGadget(connection):
-    date_path = datetime.today().strftime("%Y-%m-%d")
-    timestamp = f"{datetime.today().strftime('%H-%M-%S')}"
-
     logging.info("Initializing data processing in Python...")
     # start = time.time()
 
@@ -286,69 +283,26 @@ def IsmrmrdToNiftiGadget(connection):
     # # # #  SETTING UP LOCALISER JUST ONCE # # # # #
     # # # # # # # # # # # # # # # # # # # # # # # # #
 
-    rotx = 0.0
-    roty = 0.0
-    rotz = 0.0
-    xcm = 0.0
-    ycm = 0.0
-    zcm = 0.0
-    x = 0.0
-    y = 0.0
-    z = 0.0
-
     for acquisition in connection:
         # print(acquisition)
-        imag = np.abs(acquisition.data.transpose(3, 2, 1, 0))
-        print("Slice Dimensions ", imag.shape)
+        # imag = np.abs(acquisition.data.transpose(3, 2, 1, 0))
+        # print("Slice Dimensions ", imag.shape)
 
-        ndim = imag.shape
+        # ndim = imag.shape
         # print("ndim ", ndim)
 
         # Get crop image, flip and rotate to match with true Nifti image
-        img = imag[:, :, :, 0]
+        # img = imag[:, :, :, 0]
 
         # Stuff into the buffer
         slice = acquisition.slice
         repetition = acquisition.repetition
         contrast = acquisition.contrast
-        print("Repetition ", repetition, "Slice ", slice, "Contrast ", contrast)
-
-        logging.info("Storing each slice into the 3D data buffer...")
-        im[:, :, slice] = np.squeeze(img[:, :, 0])
-
-        # rotx = acquisition.user_float[0]
-        # roty = acquisition.user_float[1]
-        # rotz = acquisition.user_float[2]
-        #
-        # cmx = acquisition.user_float[3]
-        # cmy = acquisition.user_float[4]
-        # cmz = acquisition.user_float[5]
+        # print("Repetition ", repetition, "Slice ", slice, "Contrast ", contrast)
 
         # if the whole stack of slices has been acquired >> apply network to the entire 3D volume
         if slice == nslices - 1:
-            logging.info("All slices stored into the data buffer!")
-
-            # SNS modified - for interleaved acquisitions!
-            if nslices % 2 != 0:
-                mid = int(nslices / 2) + 1
-            else:
-                mid = int(nslices / 2)
-            # print("This is the mid slice: ", mid)
-            im_corr2a = im[:, :, 0:mid]
-            im_corr2b = im[:, :, mid:]
-
-            im_corr2ab = np.zeros(np.shape(im), dtype='complex_')
-
-            im_corr2ab[:, :, ::2] = im_corr2a
-            im_corr2ab[:, :, 1::2] = im_corr2b
-
             print("..................................................................................")
-
-            # Save as nib file - IMG GT
-            gt_img = nib.Nifti1Image(np.abs(im_corr2ab), np.eye(4))
-            name = figstring("gadgetron-fetal-brain-reconstruction")
-            nib.save(gt_img, '/home/sn21/data/t2-stacks/' + name + '_img.nii.gz')
-            img_tmp_info = nib.load('/home/sn21/data/t2-stacks/' + name + '_img.nii.gz')
 
             # os.system("docker run --rm  --mount type=bind,source=/home/sn21/data/t2-stacks,target=/home/data  "
             #           "fetalsvrtk/svrtk:auto-2.20 sh -c ' bash /home/auto-proc-svrtk/auto-brain-reconstruction.sh "
@@ -363,16 +317,36 @@ def IsmrmrdToNiftiGadget(connection):
 
             print(f"There are {num_files} files in the directory.")
 
-            if num_files >= 6:
-                print("Launching docker now...")
+            # im = np.load('/home/sn21/data/t2-stacks/' + date_path + '/imgSaved.npy')
+            # # Save as nib file - IMG GT
+            # gt_img = nib.Nifti1Image(np.abs(im), np.eye(4))
+            # name = figstring("gadgetron-fetal-brain-reconstruction")
+            # nib.save(gt_img, '/home/sn21/data/t2-stacks/' + name + '_img.nii.gz')
+            # img_tmp_info = nib.load('/home/sn21/data/t2-stacks/' + name + '_img.nii.gz')
 
-                command = f'''gnome-terminal -- bash -c "docker run --rm --mount type=bind,source=/home/sn21/data/t2-stacks,target=/home/data fetalsvrtk/svrtk:auto-2.20 sh -c 'bash /home/auto-proc-svrtk/auto-brain-reconstruction.sh /home/data/{date_path} /home/data/{date_path}-result 1 4.5 1.0 1 ;'"'''
+            # if num_files >= 6:
+            #     print("Launching docker now...")
+            #
+            #     command = f'''gnome-terminal -- bash -c "docker run --rm --mount type=bind,source=/home/sn21/data/t2-stacks,target=/home/data fetalsvrtk/svrtk:auto-2.20 sh -c 'bash /home/auto-proc-svrtk/auto-brain-reconstruction.sh /home/data/{date_path} /home/data/{date_path}-result 1 4.5 1.0 1 ;'"'''
+            #
+            #     subprocess.call(['bash', '-c', command])
 
-                subprocess.call(['bash', '-c', command])
+            print("Launching docker now...")
 
-            send_reconstructed_images_wcm(connection, imag, rotx, roty, rotz, x, y, z, acquisition)
+            # Set the DISPLAY and XAUTHORITY environment variables
+            os.environ['DISPLAY'] = ':1'  # Replace with your X11 display, e.g., ':1.0'
+            os.environ['XAUTHORITY'] = '/home/sn21/.Xauthority'
 
-        else:
-            send_reconstructed_images_wcm(connection, imag, rotx, roty, rotz, xcm, ycm, zcm, acquisition)
+            command = f'''docker run --rm --mount type=bind,source=/home/sn21/data/t2-stacks,target=/home/data fetalsvrtk/svrtk:auto-2.20 sh -c 'bash /home/auto-proc-svrtk/auto-brain-reconstruction.sh /home/data/{date_path} /home/data/{date_path}-result 1 4.5 1.0 1 ;' '''
 
-        continue
+            # Use the read command to wait for user input before closing the terminal
+            os.system(f'gnome-terminal -- bash -c "{command}"')
+            # time.sleep(5)
+
+            # print("hi!")
+            # command = f'''gnome-terminal -- bash -c "docker run --rm --mount type=bind,source=/home/sn21/data/t2-stacks,target=/home/data fetalsvrtk/svrtk:auto-2.20 sh -c 'bash /home/auto-proc-svrtk/auto-brain-reconstruction.sh /home/data/{date_path} /home/data/{date_path}-result 1 4.5 1.0 1 ;'"'''
+            #
+            # subprocess.call(['bash', '-c', command]) # check this
+            # subprocess.call(['bash', '-c', command], env=dict(os.environ, DISPLAY=":0.0", XAUTHORITY="/home/sn21/.Xauthority")) # check this
+            # subprocess.Popen(["/usr/bin/zenity", "--info", "--text", "please reboot for changes to take effect"],
+            #                  env=dict(os.environ, DISPLAY=":0.0", XAUTHORITY="/home/pi/.Xauthority"))
